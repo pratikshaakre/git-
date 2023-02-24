@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myconfigmap
+  labels:
+    app: myapplication
+data:
+  password: password@12345
+  Username: Root
+  localuser: kinjal
+  localpassword: kinjal@123456
