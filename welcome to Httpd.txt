@@ -1,0 +1,77 @@
+________creating an ec2 instance
+--with filter without ami
+--create your security group
+--create ur own key-pair
+--pass userdate -HTTP or nginx
+
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.0"
+    }
+  }
+}
+
+provider "aws" {
+  region     = "us-east-2"
+  access_key = "AKIASEVL76G7BRJ6QRZF"
+  secret_key = "5xE2EOcp0fRxB5HOwqE/wQN42ugbsZKE5S2Lse/G"
+} 
+resource "aws_instance" "example_instance" {
+  ami           =   data.aws_ami.amazon_linux.id
+  instance_type = "t2.micro"
+  key_name      = "deployer-key"
+
+user_data = <<EOF
+#!/bin/bash
+sudo yum update -y
+sudo yum install httpd -y
+sudo systemctl start httpd
+sudo systemctl enable httpd
+EOF
+
+  tags = {
+    Name = "example_Instance"
+  }
+}
+
+resource "aws_security_group" "allow_tls" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic"
+
+
+  ingress {
+    description      = "TLS from VPC"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+}
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+  } 
+}
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["amazon"]
+}
+resource "aws_key_pair" "deployer" {
+  key_name   = "deployer-key"
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDPrH+N5kmpjOXiBKCGOvwmpP70BxkV4vsJryXF0XidHzsBQQBUnukslrk4VFLUA6J9U8etkjnEJnpLZPJQtlYhTSpAtYYkiGbDi+HI8ruUB3+r7DlfYKLiz6Kqt70bJeqo0xC/zu9NJlUXrRkCa8ZTMi4OqxbIPfJjYRvJtS8GpLP+5NB9F5R7cv/3Twz1K+e7Ra4+zf1EX820+osu9mxifLxc8LLBWFs2jxvfZd9eSXJ+19jF3WM07FsIZil8ONtoTv2Z81j3MI6IL0h3wXccxtftkEvSdD41qyb0Wq7sI6gbE6nZa1QT39kk6XdJNNb/pCO2Aotxz0frD4vq+PwtbENc1pSAPxqjKBap4+AxLhHQGHLmSi46kDr5DY/qx5us4cgUIBfNdvOzkLwcByKpq+8yK4timcHisz3d4Qgxt4/dAmpV7n43QcRzuQeC6L3fXCI3sNZwiF2wFEFgle/nR98MpY0BoszH2ej7oBNpbh3XlAokpzIi+RJseDeh/Zk= HP@LAPTOP-LQ7RPJO7"
+}
