@@ -1,0 +1,14 @@
+Namespace           date:22/02/23
+it is of 4 types:
+1.default          
+2.kube-node-lease   
+3.kube-public      
+4.kube-system 
+---------------------------
+1. kubectl get ns ....{shows all namespaces}
+2.kubectl api-resources | grep ns
+3.kubectl get all -A    ....{shows all ns related info ....which ns is given to which process}
+4.   kubectl create ns -h   ......shows help and command also
+ 5.kubectl create ns enx      ...........create a namespace i.e <enx>
+ 6.  kubectl create ns prov --dry-run=client -o yaml > ns.yaml
+7. kubectl run nginx --image=nginx --namespace=default

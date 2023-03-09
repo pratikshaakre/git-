@@ -1,0 +1,23 @@
+EKS   ...                                                                                         date:17/02/23
+creation of pod ......
+ 1 -cluster created
+2-now creating a pod
+vim pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    ports:
+    - containerPort: 80
+
+.....note extension must be in a yaml <always>
+kubectl get node   {use for checking nodes}
+ kubectl apply -f pod.yaml  {pod created}
+kubectl get pod
+kubectl describe pod
+                             
