@@ -1,0 +1,133 @@
+https://www.sammeechward.com/terraform-vpc-subnets-ec2-and-more
+
+
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.0"
+    }
+  }
+}
+
+provider "aws" {
+  region     = "us-east-2"
+  access_key = "AKIASEVL76G7BRJ6QRZF"
+  secret_key = "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"
+} 
+resource "aws_vpc" "some_custom_vpc" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name = "VPC-1"
+  }
+}
+resource "aws_subnet" "some_public_subnet1" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Public Subnet-1"
+  }
+}
+resource "aws_subnet" "some_public_subnet2" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Public Subnet-2"
+  }
+}
+
+resource "aws_subnet" "some_private_subnet1" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Private Subnet-1"
+  }
+}
+resource "aws_subnet" "some_private_subnet2" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.4.0/24"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Private Subnet-2"
+  }
+}
+resource "aws_internet_gateway" "some_ig" {
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  tags = {
+    Name = "Internet Gateway"
+  }
+}
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.some_ig.id
+  }
+   tags = {
+    Name = "Public Route Table"
+  }
+} 
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.some_ig.id
+  }
+   tags = {
+    Name = "Private Route Table"
+  }
+} 
+resource "aws_route_table_association" "some_public_subnet1" {
+  subnet_id      = aws_subnet.some_public_subnet1.id
+  route_table_id = aws_route_table.public_rt.id
+}
+resource "aws_route_table_association" "some_public_subnet2" {
+  subnet_id      = aws_subnet.some_public_subnet2.id
+  route_table_id = aws_route_table.public_rt.id
+}
+resource "aws_route_table_association" "some_private_subnet1"  {
+  subnet_id      = aws_subnet.some_private_subnet1.id
+  route_table_id = aws_route_table.private_rt.id
+}
+resource "aws_route_table_association" "some_private_subnet2" {
+  subnet_id      = aws_subnet.some_private_subnet2.id
+  route_table_id = aws_route_table.private_rt.id
+}
+resource "aws_security_group" "web_sg" {
+  name   = "HTTP and SSH"
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = -1
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+

@@ -1,0 +1,255 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.0"
+    }
+  }
+}
+
+provider "aws" {
+  region     = "us-east-2"
+  access_key = "AKIASEVL76G7BRJ6QRZF"
+  secret_key = "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"
+} 
+resource "aws_vpc" "some_custom_vpc" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name = "VPC-1"
+  }
+}
+resource "aws_subnet" "some_public_subnet1" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-2a"
+ map_public_ip_on_launch = true
+  tags = {
+    Name = "Public Subnet-1"
+  }
+}
+resource "aws_subnet" "some_public_subnet2" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Public Subnet-2"
+  }
+}
+
+resource "aws_subnet" "some_private_subnet1" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Private Subnet-1"
+  }
+}
+resource "aws_subnet" "some_private_subnet2" {
+  vpc_id            = aws_vpc.some_custom_vpc.id
+  cidr_block        = "10.0.4.0/24"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Private Subnet-2"
+  }
+}
+resource "aws_internet_gateway" "Internet_Gateway" {
+  depends_on = [
+    aws_vpc.some_custom_vpc,
+    aws_subnet.some_public_subnet1,
+    aws_subnet.some_public_subnet2
+  ]
+  
+  # VPC in which it has to be created!
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  tags = {
+    Name = "IG-Public-&-Private-VPC"
+  }
+}
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.Internet_Gateway.id
+  }
+   tags = {
+    Name = "Public Route Table"
+  }
+} 
+# Creating a Route Table for the Nat Gateway!
+resource "aws_route_table" "NAT-Gateway-RT" {
+  depends_on = [
+    aws_nat_gateway.NAT_GATEWAY
+  ]
+  vpc_id = aws_vpc.some_custom_vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.NAT_GATEWAY.id
+  }
+  tags = {
+    Name = "Route Table for NAT Gateway"
+  }
+}
+# Creating an Route Table Association of the NAT Gateway route 
+# table with the Private Subnet!
+resource "aws_route_table_association" "Nat-Gateway-RT-Association" {
+  depends_on = [
+    aws_route_table.NAT-Gateway-RT
+  ]
+
+#  Private Subnet ID for adding this route table to the DHCP server of Private subnet!
+  subnet_id      = aws_subnet.some_private_subnet1.id
+
+# Route Table ID
+  route_table_id = aws_route_table.NAT-Gateway-RT.id
+}
+resource "aws_route_table_association" "Nat-Gateway-RT2-Association" {
+  depends_on = [
+    aws_route_table.NAT-Gateway-RT
+  ]
+
+#  Private Subnet ID for adding this route table to the DHCP server of Private subnet!
+  subnet_id      = aws_subnet.some_private_subnet2.id
+
+# Route Table ID
+  route_table_id = aws_route_table.NAT-Gateway-RT.id
+}
+resource "aws_route_table_association" "some_public_subnet1" {
+  subnet_id      = aws_subnet.some_public_subnet1.id
+  route_table_id = aws_route_table.public_rt.id
+}
+resource "aws_route_table_association" "some_public_subnet2" {
+  subnet_id      = aws_subnet.some_public_subnet2.id
+  route_table_id = aws_route_table.public_rt.id
+}
+resource "aws_security_group" "web_sg" {
+  name   = "HTTP and SSH"
+  vpc_id = aws_vpc.some_custom_vpc.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = -1
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_eip" "Nat-Gateway-EIP" {
+  depends_on = [
+    aws_route_table_association.some_public_subnet1
+  ]
+  vpc = true
+  tags = {
+    Name = "Elstic-EIP"
+  }
+}
+
+# Creating a NAT Gateway!
+resource "aws_nat_gateway" "NAT_GATEWAY" {
+  depends_on = [
+    aws_eip.Nat-Gateway-EIP
+  ]
+
+  # Allocating the Elastic IP to the NAT Gateway!
+  allocation_id = aws_eip.Nat-Gateway-EIP.id
+  
+  # Associating it in the Public Subnet!
+  subnet_id = aws_subnet.some_public_subnet1.id
+  tags = {
+    Name = "Nat-Gateway_Project"
+  }
+}
+resource "aws_instance" "private_instance" {
+  ami           =   "ami-0f3c9c466bb525749"
+  instance_type = "t2.micro"
+  key_name      = "docker-1"
+  subnet_id = aws_subnet.some_private_subnet1.id
+user_data = <<EOF
+#!/bin/bash
+sudo yum update -y
+sudo amazon-linux-extras install nginx1
+sudo systemctl start nginx
+sudo systemctl enable nginx
+EOF
+
+  tags = {
+    Name = "Private_Instance1"
+  }
+}
+
+resource "aws_security_group" "allow_tls" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic"
+
+
+  ingress {
+    description      = "TLS from VPC"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+}
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+  } 
+}
+resource "aws_instance" "public_instance" {
+  ami           =   "ami-0f3c9c466bb525749"
+  instance_type = "t2.micro"
+  key_name      = "docker-1"
+  subnet_id = aws_subnet.some_public_subnet1.id
+  user_data = <<EOF
+#!/bin/bash
+sudo yum update -y
+sudo yum install httpd -y
+sudo systemctl start httpd
+sudo systemctl enable httpd
+EOF
+    tags = {
+    Name = "Public_Instance1"
+  }
+}
+resource "aws_security_group" "allow_tls2" {
+  name        = "allow_tls2"
+  description = "Allow TLS for inbound traffic"
+
+
+  ingress {
+    description      = "TLS from VPC"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+}
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+  } 
+}
+
+
+   
+   
